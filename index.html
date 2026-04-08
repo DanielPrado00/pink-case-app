@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Pink Case Filter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: #1a0a10;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-glow {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .bg-glow.one { background: #ff4080; top: -100px; left: -100px; }
+        .bg-glow.two { background: #ff6090; bottom: -100px; right: -100px; }
+
+        header {
+            text-align: center;
+            padding: 40px 20px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff6b9d, #ff4080, #ff9ecf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+
+        header p {
+            color: #cc8a9e;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-zone {
+            border: 2px dashed #ff407066;
+            border-radius: 20px;
+            padding: 50px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #ff40800a;
+            margin-bottom: 20px;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #ff4080;
+            background: #ff408018;
+            transform: scale(1.01);
+        }
+        .upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+        .upload-zone .text { color: #cc8a9e; font-size: 0.95rem; }
+        .upload-zone .text strong { color: #ff6b9d; }
+
+        input[type="file"] { display: none; }
+
+        .controls {
+            background: #2a1019;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .controls.visible { display: block; }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+        .control-group:last-child { margin-bottom: 0; }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #cc8a9e;
+            margin-bottom: 8px;
+        }
+        .control-group label span {
+            color: #ff6b9d;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #3a1525;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff4080;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff408066;
+        }
+
+        .preview-area {
+            position: relative;
+            margin-bottom: 20px;
+            display: none;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+        }
+        .preview-area.visible { display: block; }
+
+        .preview-area canvas {
+            width: 100%;
+            display: block;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: none;
+        }
+        .btn.visible { display: block; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff4080, #ff6b9d);
+            color: #fff;
+            box-shadow: 0 4px 20px #ff408044;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px #ff408066;
+        }
+
+        .btn-secondary {
+            background: #2a1019;
+            color: #ff6b9d;
+            border: 1px solid #ff407033;
+        }
+        .btn-secondary:hover {
+            background: #3a1525;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            margin-bottom: 40px;
+        }
+        .gallery img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .gallery img:hover {
+            transform: scale(1.03);
+        }
+
+        .gallery-title {
+            text-align: center;
+            color: #cc8a9e;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: none;
+        }
+        .gallery-title.visible { display: block; }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #ff6b9d;
+        }
+        .loading.visible { display: block; }
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #3a1525;
+            border-top: 3px solid #ff4080;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000e;
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .lightbox.visible { display: flex; }
+        .lightbox img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow one"></div>
+    <div class="bg-glow two"></div>
+
+    <header>
+        <h1>El Pink Case</h1>
+        <p>Aplica el filtro del case rosado a tus fotos</p>
+    </header>
+
+    <div class="container">
+        <div class="upload-zone" id="uploadZone">
+            <div class="icon">📸</div>
+            <div class="text">Toca para subir una foto o <strong>arrastra aquí</strong></div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" multiple>
+
+        <div class="controls" id="controls">
+            <div class="control-group">
+                <label>Intensidad del rosa <span id="tintVal">60%</span></label>
+                <input type="range" id="tintIntensity" min="0" max="100" value="60">
+            </div>
+            <div class="control-group">
+                <label>Cantidad de círculos <span id="circlesVal">14</span></label>
+                <input type="range" id="circlesCount" min="0" max="30" value="14">
+            </div>
+            <div class="control-group">
+                <label>Tamaño de círculos <span id="circleSizeVal">80%</span></label>
+                <input type="range" id="circleSize" min="10" max="150" value="80">
+            </div>
+            <div class="control-group">
+                <label>Opacidad de círculos <span id="circleOpacityVal">70%</span></label>
+                <input type="range" id="circleOpacity" min="10" max="100" value="70">
+            </div>
+            <div class="control-group">
+                <label>Light leak (bordes) <span id="leakVal">50%</span></label>
+                <input type="range" id="lightLeak" min="0" max="100" value="50">
+            </div>
+            <div class="control-group">
+                <label>Viñeta <span id="vignetteVal">40%</span></label>
+                <input type="range" id="vignette" min="0" max="100" value="40">
+            </div>
+        </div>
+
+        <div class="preview-area" id="previewArea">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Aplicando el pink case...</div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn btn-secondary" id="btnNew">Otra foto</button>
+            <button class="btn btn-primary" id="btnDownload">Guardar foto</button>
+        </div>
+
+        <div class="gallery-title" id="galleryTitle">Fotos procesadas</div>
+        <div class="gallery" id="gallery"></div>
+    </div>
+
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lightboxClose">&times;</button>
+        <img id="lightboxImg" src="">
+    </div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const canvas = $('canvas');
+        const ctx = canvas.getContext('2d');
+        let currentImage = null;
+        let circlePositions = [];
+
+        // Upload handling
+        $('uploadZone').addEventListener('click', () => $('fileInput').click());
+        $('fileInput').addEventListener('change', e => {
+            if (e.target.files.length) loadImage(e.target.files[0]);
+        });
+
+        // Drag & drop
+        const zone = $('uploadZone');
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) loadImage(e.dataTransfer.files[0]);
+        });
+
+        function loadImage(file) {
+            const img = new Image();
+            img.onload = () => {
+                currentImage = img;
+                generateCirclePositions();
+                showControls();
+                applyFilter();
+            };
+            img.src = URL.createObjectURL(file);
+        }
+
+        function generateCirclePositions() {
+            circlePositions = [];
+            const count = 35;
+            for (let i = 0; i < count; i++) {
+                circlePositions.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    r: 0.06 + Math.random() * 0.18,
+                    opacity: 0.3 + Math.random() * 0.5,
+                    hue: Math.random() > 0.3 ? (340 + Math.random() * 30) : (10 + Math.random() * 20),
+                    edge: Math.random()
+                });
+            }
+            // Bias most circles toward edges like a real case leak
+            for (let i = 0; i < count; i++) {
+                if (circlePositions[i].edge > 0.3) {
+                    const side = Math.floor(Math.random() * 4);
+                    if (side === 0) circlePositions[i].x = Math.random() * 0.3;
+                    else if (side === 1) circlePositions[i].x = 0.7 + Math.random() * 0.3;
+                    else if (side === 2) circlePositions[i].y = Math.random() * 0.3;
+                    else circlePositions[i].y = 0.7 + Math.random() * 0.3;
+                }
+            }
+        }
+
+        function showControls() {
+            $('controls').classList.add('visible');
+            $('previewArea').classList.add('visible');
+            $('btnNew').classList.add('visible');
+            $('btnDownload').classList.add('visible');
+            $('uploadZone').style.display = 'none';
+        }
+
+        function applyFilter() {
+            if (!currentImage) return;
+
+            const img = currentImage;
+            // Limit canvas size for performance
+            const maxDim = 1400;
+            let w = img.naturalWidth;
+            let h = img.naturalHeight;
+            if (w > maxDim || h > maxDim) {
+                const scale = maxDim / Math.max(w, h);
+                w = Math.round(w * scale);
+                h = Math.round(h * scale);
+            }
+            canvas.width = w;
+            canvas.height = h;
+
+            const tint = $('tintIntensity').value / 100;
+            const numCircles = parseInt($('circlesCount').value);
+            const circleScale = $('circleSize').value / 100;
+            const circleOpac = $('circleOpacity').value / 100;
+            const leak = $('lightLeak').value / 100;
+            const vig = $('vignette').value / 100;
+
+            // Draw original image
+            ctx.drawImage(img, 0, 0, w, h);
+
+            // 1. Pink/red color overlay
+            ctx.globalCompositeOperation = 'multiply';
+            const pinkGrad = ctx.createRadialGradient(w * 0.5, h * 0.5, 0, w * 0.5, h * 0.5, w * 0.7);
+            pinkGrad.addColorStop(0, `rgba(255, 180, 200, ${tint * 0.3})`);
+            pinkGrad.addColorStop(1, `rgba(220, 60, 80, ${tint * 0.5})`);
+            ctx.fillStyle = pinkGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Additive pink layer for warmth
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = `rgba(255, 60, 100, ${tint * 0.15})`;
+            ctx.fillRect(0, 0, w, h);
+
+            // 2. Light leak effects from edges
+            ctx.globalCompositeOperation = 'screen';
+            if (leak > 0) {
+                // Bottom-right leak
+                const leak1 = ctx.createRadialGradient(w * 0.85, h * 0.8, 0, w * 0.85, h * 0.8, w * 0.6);
+                leak1.addColorStop(0, `rgba(255, 80, 100, ${leak * 0.4})`);
+                leak1.addColorStop(0.5, `rgba(255, 40, 70, ${leak * 0.15})`);
+                leak1.addColorStop(1, 'rgba(255, 40, 70, 0)');
+                ctx.fillStyle = leak1;
+                ctx.fillRect(0, 0, w, h);
+
+                // Top-left leak
+                const leak2 = ctx.createRadialGradient(w * 0.1, h * 0.15, 0, w * 0.1, h * 0.15, w * 0.5);
+                leak2.addColorStop(0, `rgba(255, 120, 150, ${leak * 0.25})`);
+                leak2.addColorStop(0.6, `rgba(255, 60, 90, ${leak * 0.08})`);
+                leak2.addColorStop(1, 'rgba(255, 60, 90, 0)');
+                ctx.fillStyle = leak2;
+                ctx.fillRect(0, 0, w, h);
+
+                // Random edge leak
+                const leak3 = ctx.createRadialGradient(w * 0.6, h * 0.1, 0, w * 0.6, h * 0.1, w * 0.4);
+                leak3.addColorStop(0, `rgba(255, 150, 170, ${leak * 0.2})`);
+                leak3.addColorStop(1, 'rgba(255, 80, 100, 0)');
+                ctx.fillStyle = leak3;
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            // 3. Bokeh circles - prominent like the pink case
+            ctx.globalCompositeOperation = 'screen';
+            for (let i = 0; i < numCircles && i < circlePositions.length; i++) {
+                const c = circlePositions[i];
+                const cx = c.x * w;
+                const cy = c.y * h;
+                const cr = c.r * Math.min(w, h) * circleScale;
+                const op = c.opacity * circleOpac;
+
+                const grad = ctx.createRadialGradient(cx, cy, cr * 0.1, cx, cy, cr);
+                const hue = c.hue;
+                const sat = 70 + Math.random() * 20;
+                // Bright solid center, soft fade out
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 80%, ${op * 0.9})`);
+                grad.addColorStop(0.3, `hsla(${hue}, ${sat}%, 70%, ${op * 0.7})`);
+                grad.addColorStop(0.6, `hsla(${hue}, ${sat}%, 60%, ${op * 0.35})`);
+                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 55%, ${op * 0.1})`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 50%, 0)`);
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Visible ring edge
+                ctx.strokeStyle = `hsla(${hue}, 60%, 75%, ${op * 0.5})`;
+                ctx.lineWidth = Math.max(1.5, cr * 0.07);
+                ctx.stroke();
+            }
+
+            // 4. Vignette
+            if (vig > 0) {
+                ctx.globalCompositeOperation = 'multiply';
+                const vigGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.75);
+                vigGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                vigGrad.addColorStop(0.5, `rgba(80, 20, 40, ${vig * 0.3})`);
+                vigGrad.addColorStop(1, `rgba(30, 5, 15, ${vig * 0.7})`);
+                ctx.fillStyle = vigGrad;
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            // 5. Final warm tint
+            ctx.globalCompositeOperation = 'overlay';
+            ctx.fillStyle = `rgba(255, 100, 120, ${tint * 0.08})`;
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // Slider events
+        ['tintIntensity', 'circlesCount', 'circleSize', 'circleOpacity', 'lightLeak', 'vignette'].forEach(id => {
+            $(id).addEventListener('input', () => {
+                $('tintVal').textContent = $('tintIntensity').value + '%';
+                $('circlesVal').textContent = $('circlesCount').value;
+                $('circleSizeVal').textContent = $('circleSize').value + '%';
+                $('circleOpacityVal').textContent = $('circleOpacity').value + '%';
+                $('leakVal').textContent = $('lightLeak').value + '%';
+                $('vignetteVal').textContent = $('vignette').value + '%';
+                applyFilter();
+            });
+        });
+
+        // Download
+        $('btnDownload').addEventListener('click', () => {
+            // Render at full res for download
+            const img = currentImage;
+            const origW = canvas.width;
+            const origH = canvas.height;
+
+            // Re-render at full res
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            applyFilter();
+
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'pinkcase_' + Date.now() + '.jpg';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                // Add to gallery
+                const galleryImg = document.createElement('img');
+                galleryImg.src = canvas.toDataURL('image/jpeg', 0.9);
+                galleryImg.addEventListener('click', () => {
+                    $('lightboxImg').src = galleryImg.src;
+                    $('lightbox').classList.add('visible');
+                });
+                $('gallery').prepend(galleryImg);
+                $('galleryTitle').classList.add('visible');
+
+                // Restore preview size
+                canvas.width = origW;
+                canvas.height = origH;
+                applyFilter();
+            }, 'image/jpeg', 0.92);
+        });
+
+        // New photo
+        $('btnNew').addEventListener('click', () => {
+            $('fileInput').value = '';
+            $('fileInput').click();
+        });
+
+        // Lightbox
+        $('lightboxClose').addEventListener('click', () => $('lightbox').classList.remove('visible'));
+        $('lightbox').addEventListener('click', e => {
+            if (e.target === $('lightbox')) $('lightbox').classList.remove('visible');
+        });
+    </script>
+</body>
+</html>
