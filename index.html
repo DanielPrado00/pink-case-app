@@ -317,7 +317,7 @@
         <div class="buttons">
             <button class="btn btn-secondary" id="btnAdd">+ Agregar fotos</button>
             <button class="btn btn-secondary" id="btnClear">Limpiar todo</button>
-            <button class="btn btn-primary" id="btnDownload">Descargar todas</button>
+            <button class="btn btn-primary" id="btnDownload">Guardar fotos</button>
         </div>
     </div>
 
@@ -579,7 +579,25 @@
             });
         });
 
-        // Download all as ZIP
+        // Detect iOS / mobile share capability
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        async function renderAllToBlobs() {
+            const blobs = [];
+            for (let i = 0; i < photos.length; i++) {
+                const photo = photos[i];
+                $('status').textContent = `Procesando foto ${i + 1} de ${photos.length}...`;
+                renderPhoto(photo, false);
+                const blob = await new Promise(r => photo.canvas.toBlob(r, 'image/jpeg', 0.92));
+                blobs.push(blob);
+                renderPhoto(photo, true);
+                await new Promise(r => setTimeout(r, 0));
+            }
+            return blobs;
+        }
+
+        // Download all - uses iOS share sheet for Photos, ZIP for desktop
         $('btnDownload').addEventListener('click', async () => {
             if (!photos.length) return;
             const btn = $('btnDownload');
@@ -588,49 +606,58 @@
             status.classList.add('visible');
 
             try {
-                if (photos.length === 1) {
-                    // Single download
-                    status.textContent = 'Generando foto en alta resolución...';
-                    const photo = photos[0];
-                    renderPhoto(photo, false);
-                    await new Promise(resolve => {
-                        photo.canvas.toBlob(blob => {
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = 'pinkcase_' + Date.now() + '.jpg';
-                            a.click();
-                            URL.revokeObjectURL(url);
-                            resolve();
-                        }, 'image/jpeg', 0.92);
-                    });
-                    renderPhoto(photo, true);
-                } else {
-                    // Multiple - bundle in ZIP
-                    const zip = new JSZip();
-                    const folder = zip.folder('pink_case_' + Date.now());
+                const blobs = await renderAllToBlobs();
+                const files = blobs.map((blob, i) =>
+                    new File([blob], `pinkcase_${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' })
+                );
 
-                    for (let i = 0; i < photos.length; i++) {
-                        const photo = photos[i];
-                        status.textContent = `Procesando foto ${i + 1} de ${photos.length}...`;
-                        renderPhoto(photo, false);
-                        const blob = await new Promise(r => photo.canvas.toBlob(r, 'image/jpeg', 0.92));
-                        folder.file(`pinkcase_${String(i + 1).padStart(2, '0')}.jpg`, blob);
-                        renderPhoto(photo, true);
-                        await new Promise(r => setTimeout(r, 0));
+                // Try Web Share API (iOS sends to Photos via share sheet)
+                if (navigator.canShare && navigator.canShare({ files })) {
+                    status.textContent = 'Abriendo para guardar en Fotos...';
+                    try {
+                        await navigator.share({ files, title: 'Pink Case' });
+                        status.textContent = '¡Listo! ✨';
+                    } catch (err) {
+                        if (err.name !== 'AbortError') throw err;
+                        status.textContent = 'Cancelado';
                     }
-
-                    status.textContent = 'Comprimiendo ZIP...';
-                    const content = await zip.generateAsync({ type: 'blob' });
-                    const url = URL.createObjectURL(content);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'pink_case_' + Date.now() + '.zip';
-                    a.click();
-                    URL.revokeObjectURL(url);
+                } else if (navigator.canShare && files.length > 0 && navigator.canShare({ files: [files[0]] })) {
+                    // iOS share supports one file at a time only
+                    for (let i = 0; i < files.length; i++) {
+                        status.textContent = `Compartiendo ${i + 1} de ${files.length}...`;
+                        try {
+                            await navigator.share({ files: [files[i]] });
+                        } catch (err) {
+                            if (err.name === 'AbortError') break;
+                            throw err;
+                        }
+                    }
+                    status.textContent = '¡Listo! ✨';
+                } else {
+                    // Desktop fallback: single file = direct download, multiple = ZIP
+                    if (files.length === 1) {
+                        const url = URL.createObjectURL(blobs[0]);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'pinkcase_' + Date.now() + '.jpg';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    } else {
+                        status.textContent = 'Comprimiendo ZIP...';
+                        const zip = new JSZip();
+                        const folder = zip.folder('pink_case_' + Date.now());
+                        files.forEach(f => folder.file(f.name, f));
+                        const content = await zip.generateAsync({ type: 'blob' });
+                        const url = URL.createObjectURL(content);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'pink_case_' + Date.now() + '.zip';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    status.textContent = '¡Listo! ✨';
                 }
 
-                status.textContent = '¡Listo! ✨';
                 setTimeout(() => status.classList.remove('visible'), 2000);
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
